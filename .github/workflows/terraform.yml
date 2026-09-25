@@ -1,4 +1,4 @@
-name: Terraform
+name: Terraform Validation
 
 on:
   push:
@@ -10,8 +10,16 @@ permissions:
 
 jobs:
   validate:
-    name: Format and validate
+    name: Validate Terraform
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cloud: [aws, azure, gcp]
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.cloud }}
 
     steps:
       - name: Checkout
