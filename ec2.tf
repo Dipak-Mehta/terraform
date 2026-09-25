@@ -1,87 +1,107 @@
-#create security group 
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"]
 
-resource "aws_security_group" "mysg" {
-  name        = "My-SG"
-  description = "Allow TLS inbound traffic"
-  vpc_id      = aws_vpc.myvpc.id
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+}
+
+locals {
+  effective_ami_id = var.ami_id != "" ? var.ami_id : data.aws_ami.ubuntu.id
+}
+
+resource "aws_security_group" "public" {
+  name        = "${var.project_name}-public-sg"
+  description = "SSH access to the public EC2 instance"
+  vpc_id      = aws_vpc.this.id
 
   ingress {
-    description = "TLS from VPC"
+    description = "SSH from the configured administrator CIDR"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.allowed_ssh_cidr]
   }
 
   egress {
+    description = "Allow outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
-
   }
 
   tags = {
-    Name = "mysg"
+    Name    = "${var.project_name}-public-sg"
+    Project = var.project_name
   }
 }
 
-resource "aws_security_group" "mysgforprivateEC2" {
-  name        = "My-SGPVT"
-  description = "Allow TLS inbound traffic"
-  vpc_id      = aws_vpc.myvpc.id
+resource "aws_security_group" "private" {
+  name        = "${var.project_name}-private-sg"
+  description = "SSH access to the private EC2 instance from the public EC2 instance"
+  vpc_id      = aws_vpc.this.id
 
   ingress {
-    description = "TLS from VPC"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["${aws_instance.public-instance.private_ip}/32"]
-
+    description     = "SSH from public EC2 instance"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.public.id]
   }
 
   egress {
+    description = "Allow outbound traffic through the NAT Gateway"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
-
   }
 
   tags = {
-    Name = "mysgforprivateEC2"
+    Name    = "${var.project_name}-private-sg"
+    Project = var.project_name
   }
 }
 
-# output "public-ip" {
-#   value = aws_security_group.mysg_id
-
-# }
-
-# create instance public instance
-
-resource "aws_instance" "public-instance" {
-  ami                         = "ami-06489866022e12a14"
-  instance_type               = "t2.micro"
-  subnet_id                   = aws_subnet.public-subnet.id
-  security_groups             = ["${aws_security_group.mysg.id}"]
-  key_name                    = "task"
+resource "aws_instance" "public" {
+  ami                         = local.effective_ami_id
+  instance_type               = var.instance_type
+  subnet_id                   = aws_subnet.public.id
+  vpc_security_group_ids     = [aws_security_group.public.id]
+  key_name                    = var.key_name
   associate_public_ip_address = true
+
   tags = {
-    Name = "public-instance"
+    Name    = var.public_instance_name
+    Project = var.project_name
+    Tier    = "public"
   }
 }
 
-# create instance private intance
-
-resource "aws_instance" "private-instance" {
-  ami                         = "ami-01216e7612243e0ef"
-  instance_type               = "t2.micro"
-  subnet_id                   = aws_subnet.private-subnet.id
-  security_groups             = ["${aws_security_group.mysg.id}"]
-  key_name                    = "task"
+resource "aws_instance" "private" {
+  ami                         = local.effective_ami_id
+  instance_type               = var.instance_type
+  subnet_id                   = aws_subnet.private.id
+  vpc_security_group_ids     = [aws_security_group.private.id]
+  key_name                    = var.key_name
   associate_public_ip_address = false
+
   tags = {
-    Name = "private-instance"
+    Name    = var.private_instance_name
+    Project = var.project_name
+    Tier    = "private"
   }
 }
