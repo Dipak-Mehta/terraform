@@ -1,206 +1,196 @@
-# AWS Infrastructure with Terraform
+# Multi-Cloud Infrastructure with Terraform
 
-A reusable Terraform project that creates a complete AWS network foundation with **one public EC2 instance and one private EC2 instance**.
+Reusable Terraform infrastructure templates for **AWS, Azure, and GCP**.
 
-The goal is simple: **clone the repository, change the values in `terraform.tfvars`, and deploy the same infrastructure without editing the Terraform resource code.**
+The repository is organized by cloud provider. Each directory is a **self-contained Terraform project** with its own provider, variables, networking, compute, security, outputs, example variables, and README.
 
-## What this creates
+The intended workflow is:
+
+> **Choose a cloud → copy `terraform.tfvars.example` → change your values → run Terraform.**
+
+You should not need to edit the infrastructure/resource files for a normal deployment.
+
+## Repository structure
 
 ```text
-AWS
-└── VPC (10.0.0.0/16)
-    ├── Internet Gateway
-    │
-    ├── Public Subnet (10.0.1.0/24)
-    │   ├── Public Route Table → Internet Gateway
-    │   ├── NAT Gateway + Elastic IP
-    │   └── Public EC2
-    │       └── SSH from your allowed CIDR
-    │
-    └── Private Subnet (10.0.2.0/24)
-        ├── Private Route Table → NAT Gateway
-        └── Private EC2
-            └── SSH only from Public EC2
+terraform/
+├── aws/
+│   ├── provider.tf
+│   ├── variables.tf
+│   ├── vpc.tf
+│   ├── nat.tf
+│   ├── ec2.tf
+│   ├── outputs.tf
+│   ├── terraform.tfvars.example
+│   ├── .gitignore
+│   └── README.md
+│
+├── azure/
+│   ├── provider.tf
+│   ├── variables.tf
+│   ├── network.tf
+│   ├── security.tf
+│   ├── compute.tf
+│   ├── outputs.tf
+│   ├── terraform.tfvars.example
+│   ├── .gitignore
+│   └── README.md
+│
+└── gcp/
+    ├── provider.tf
+    ├── variables.tf
+    ├── network.tf
+    ├── security.tf
+    ├── compute.tf
+    ├── outputs.tf
+    ├── terraform.tfvars.example
+    ├── .gitignore
+    └── README.md
 ```
 
-### Resources
+## What each cloud creates
 
-- VPC
-- Public subnet
-- Private subnet
-- Internet Gateway
-- Public and private route tables
-- NAT Gateway
-- Elastic IP for NAT Gateway
-- Public security group
-- Private security group
-- Public EC2 instance
-- Private EC2 instance
-- Terraform outputs for important resource IDs and IPs
+| Cloud | Network | Public VM | Private VM | NAT |
+|---|---|---|---|---|
+| AWS | VPC + public/private subnets | EC2 | EC2 | NAT Gateway |
+| Azure | VNet + public/private subnets | Linux VM | Linux VM | NAT Gateway |
+| GCP | Custom VPC + public/private subnets | Compute Engine | Compute Engine | Cloud NAT |
 
-## Prerequisites
+The architecture is intentionally similar across providers so the same networking concepts are easy to understand and compare.
 
-Install:
-
-- Terraform >= 1.6
-- AWS CLI
-- An AWS account
-- An existing EC2 Key Pair in the target AWS region
-
-Configure AWS credentials using the AWS CLI or another supported AWS credential mechanism. **Do not put AWS access keys or secret keys in Terraform files.**
-
-Example:
+## AWS
 
 ```bash
-aws configure
-aws sts get-caller-identity
-```
-
-## Quick start
-
-### 1. Clone
-
-```bash
-git clone https://github.com/Dipak-Mehta/terraform.git
-cd terraform
-```
-
-### 2. Create your variables file
-
-```bash
+cd aws
 cp terraform.tfvars.example terraform.tfvars
-```
+# edit terraform.tfvars
 
-Edit only `terraform.tfvars`.
-
-At minimum, change:
-
-```hcl
-allowed_ssh_cidr = "YOUR_PUBLIC_IP/32"
-key_name         = "YOUR_EXISTING_KEYPAIR_NAME"
-```
-
-You can also change the region, CIDRs, instance type, names, and other values.
-
-### 3. Initialize
-
-```bash
 terraform init
-```
-
-### 4. Format and validate
-
-```bash
 terraform fmt -recursive
 terraform validate
-```
-
-### 5. Review the plan
-
-```bash
 terraform plan
-```
-
-### 6. Create the infrastructure
-
-```bash
 terraform apply
 ```
 
-Type `yes` when prompted.
+Creates a VPC, public/private subnets, Internet Gateway, NAT Gateway, route tables, security groups, and two EC2 instances.
 
-### 7. Get connection information
-
-```bash
-terraform output
-```
-
-The public EC2 address is available with:
+## Azure
 
 ```bash
-terraform output -raw public_instance_public_ip
+cd azure
+cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars
+
+az login
+terraform init
+terraform fmt -recursive
+terraform validate
+terraform plan
+terraform apply
 ```
 
-## SSH flow
+Creates a resource group, VNet, public/private subnets, NAT Gateway, NSGs, and two Ubuntu Linux VMs.
 
-The public instance is reachable from the CIDR configured in `allowed_ssh_cidr`.
+## GCP
 
-The private instance is **not directly exposed to the internet**. Its security group allows SSH only from the public instance's security group.
+```bash
+cd gcp
+cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars
 
-Typical flow:
-
-```text
-Your Laptop
-    |
-    | SSH
-    v
-Public EC2
-    |
-    | SSH over private VPC network
-    v
-Private EC2
+gcloud auth application-default login
+terraform init
+terraform fmt -recursive
+terraform validate
+terraform plan
+terraform apply
 ```
 
-The private subnet uses the NAT Gateway for outbound internet access when required.
+Creates a custom VPC, public/private subnets, Cloud Router, Cloud NAT, firewall rules, and two Ubuntu Compute Engine VMs.
 
-## Important security notes
+## What you normally change
 
-- Never commit `terraform.tfvars`, AWS credentials, private keys, or Terraform state files.
-- Restrict `allowed_ssh_cidr` to your public IP, preferably as `x.x.x.x/32`.
-- This project intentionally does not create or store an SSH private key.
-- NAT Gateway and EC2 resources can incur AWS charges. Review the plan and AWS pricing before applying.
-- The default Ubuntu AMI lookup selects the latest Ubuntu 24.04 LTS AMD64 image available in the selected region. Set `ami_id` if you need a specific AMI.
+Each cloud has its own `terraform.tfvars.example`.
 
-## Customization
+Typical values to change:
 
-Most users only need to edit:
+- Cloud region / zone
+- Project or subscription ID
+- VPC/VNet CIDRs
+- Public/private subnet CIDRs
+- Your public IP for SSH
+- Existing SSH key / public key
+- VM instance size
+- Resource naming
 
-| Variable | Purpose |
-|---|---|
-| `aws_region` | AWS region |
-| `project_name` | Resource naming prefix |
-| `vpc_cidr` | VPC network range |
-| `public_subnet_cidr` | Public subnet range |
-| `private_subnet_cidr` | Private subnet range |
-| `availability_zone` | Availability Zone |
-| `allowed_ssh_cidr` | Public EC2 SSH source |
-| `key_name` | Existing EC2 Key Pair |
-| `ami_id` | Optional custom AMI |
-| `instance_type` | EC2 size |
-| `public_instance_name` | Public EC2 name |
-| `private_instance_name` | Private EC2 name |
+Example:
 
-No resource files need to be edited for normal deployments.
+```hcl
+allowed_ssh_cidr = "YOUR_PUBLIC_IP/32"
+```
 
-## Destroy
+This keeps SSH access restricted instead of exposing port 22 to the entire internet.
 
-When you are finished:
+## Authentication
+
+This repository does **not** contain cloud credentials.
+
+Use the standard CLI/credential mechanism for each provider:
+
+- AWS: AWS CLI credentials, IAM role, or environment variables
+- Azure: Azure CLI / managed identity / supported environment variables
+- GCP: Application Default Credentials, workload identity, or supported environment variables
+
+Never put access keys, service-account JSON files, passwords, or private SSH keys into this repository.
+
+## Cost warning
+
+These configurations create real cloud resources and can incur charges, especially:
+
+- AWS NAT Gateway
+- Azure NAT Gateway
+- GCP Cloud NAT
+- EC2 / Azure VM / GCE instances
+- Public IP addresses
+
+Always review `terraform plan` and your cloud provider pricing before applying.
+
+## Destroy infrastructure
+
+Each cloud directory has its own Terraform state.
 
 ```bash
 terraform destroy
 ```
 
-Review the destroy plan carefully before confirming.
+Run this from the cloud directory you deployed.
 
-## Project structure
+## Design goal
+
+This repository is designed as a **simple, reusable multi-cloud Terraform reference**:
 
 ```text
-.
-├── provider.tf
-├── variables.tf
-├── vpc.tf
-├── nat.tf
-├── ec2.tf
-├── outputs.tf
-├── terraform.tfvars.example
-├── .gitignore
-└── README.md
+                 Terraform
+                     |
+        ┌────────────┼────────────┐
+        │            │            │
+       AWS         Azure          GCP
+        │            │            │
+       VPC          VNet       Custom VPC
+        │            │            │
+   Public/Private Public/Private Public/Private
+        │            │            │
+     EC2 x2       VM x2         GCE x2
+        │            │            │
+       NAT          NAT         Cloud NAT
 ```
 
-## Notes for contributors
+For normal use, change variables rather than resource code.
 
-The resource architecture is intentionally kept simple so it is easy to understand and reuse. If you extend it, keep environment-specific values in variables rather than hard-coding them into resources.
+## Validation
+
+GitHub Actions validates Terraform formatting and configuration for the cloud projects on every push and pull request.
 
 ---
 
-Built as a reusable AWS Terraform reference project by Dipak Mehta.
+Built as a reusable multi-cloud Terraform reference by Dipak Mehta.
