@@ -1,73 +1,66 @@
-//create VPC
-
-resource "aws_vpc" "myvpc" {
-  cidr_block       = "10.0.0.0/16"
-  instance_tenancy = "default"
+resource "aws_vpc" "this" {
+  cidr_block           = var.vpc_cidr
+  instance_tenancy     = "default"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
 
   tags = {
-    Name = "My_VPC"
+    Name    = "${var.project_name}-vpc"
+    Project = var.project_name
   }
 }
 
-#create subnet for public 
-
-resource "aws_subnet" "public-subnet" {
-  vpc_id                  = aws_vpc.myvpc.id
-  cidr_block              = "10.0.1.0/24"
-  map_public_ip_on_launch = "true"
-  availability_zone       = "ap-south-1a"
+resource "aws_subnet" "public" {
+  vpc_id                  = aws_vpc.this.id
+  cidr_block              = var.public_subnet_cidr
+  availability_zone       = var.availability_zone
+  map_public_ip_on_launch = true
 
   tags = {
-    Name = "public-subnet"
+    Name    = "${var.project_name}-public-subnet"
+    Project = var.project_name
+    Tier    = "public"
   }
 }
 
-//create private subnet
-
-resource "aws_subnet" "private-subnet" {
-  vpc_id                  = aws_vpc.myvpc.id
-  cidr_block              = "10.0.2.0/24"
-  map_public_ip_on_launch = "false"
-  availability_zone       = "ap-south-1a"
+resource "aws_subnet" "private" {
+  vpc_id                  = aws_vpc.this.id
+  cidr_block              = var.private_subnet_cidr
+  availability_zone       = var.availability_zone
+  map_public_ip_on_launch = false
 
   tags = {
-    Name = "private-subnet"
+    Name    = "${var.project_name}-private-subnet"
+    Project = var.project_name
+    Tier    = "private"
   }
 }
 
-# create IGW(internet gateway)
-
-resource "aws_internet_gateway" "myigw" {
-  vpc_id = aws_vpc.myvpc.id
+resource "aws_internet_gateway" "this" {
+  vpc_id = aws_vpc.this.id
 
   tags = {
-    Name = "myigw"
+    Name    = "${var.project_name}-igw"
+    Project = var.project_name
   }
 }
 
-# create route table for public
-
-resource "aws_route_table" "public-rt" {
-  vpc_id = aws_vpc.myvpc.id
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.this.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.myigw.id
+    gateway_id = aws_internet_gateway.this.id
   }
-
 
   tags = {
-    Name = "public-rt"
+    Name    = "${var.project_name}-public-rt"
+    Project = var.project_name
+    Tier    = "public"
   }
 }
-#157.33.196.43/32
 
-
-
-
-# create route table association
-
-resource "aws_route_table_association" "public-association" {
-  subnet_id      = aws_subnet.public-subnet.id
-  route_table_id = aws_route_table.public-rt.id
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
 }
