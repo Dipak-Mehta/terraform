@@ -1,0 +1,11 @@
+*.tfvars
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.pem
+*.key
+.env
+.vscode/
+.idea/
