@@ -35,7 +35,3 @@ resource "google_compute_router_nat" "this" {
     source_ip_ranges_to_nat = ["ALL_IP_RANGES"]
   }
 }
-
-resource "google_compute_global_address" "reserved" {
-  name = "${var.project_name}-reserved-ip"
-}
