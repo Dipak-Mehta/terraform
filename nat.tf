@@ -1,43 +1,42 @@
-# create elastic IP
-
-resource "aws_eip" "eipfornat" {
-  vpc        = true
-  depends_on = [aws_internet_gateway.myigw]
-  tags = {
-    Name = "NAT-GW-ELASTICIP"
-  }
-}
-
-# create NAT gateway
-
-resource "aws_nat_gateway" "mynatgateway" {
-  allocation_id = aws_eip.eipfornat.id
-  subnet_id     = aws_subnet.public-subnet.id
+resource "aws_eip" "nat" {
+  domain = "vpc"
 
   tags = {
-    Name = "mynatgateway"
+    Name    = "${var.project_name}-nat-eip"
+    Project = var.project_name
   }
+
+  depends_on = [aws_internet_gateway.this]
 }
 
-# create route table for private
+resource "aws_nat_gateway" "this" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public.id
 
-resource "aws_route_table" "private-rt" {
-  vpc_id = aws_vpc.myvpc.id
+  tags = {
+    Name    = "${var.project_name}-nat-gateway"
+    Project = var.project_name
+  }
+
+  depends_on = [aws_internet_gateway.this]
+}
+
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.this.id
 
   route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_nat_gateway.mynatgateway.id
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.this.id
   }
 
-
   tags = {
-    Name = "private-rt"
+    Name    = "${var.project_name}-private-rt"
+    Project = var.project_name
+    Tier    = "private"
   }
 }
 
-# create route table association
-
-resource "aws_route_table_association" "private-association" {
-  subnet_id      = aws_subnet.private-subnet.id
-  route_table_id = aws_route_table.private-rt.id
+resource "aws_route_table_association" "private" {
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private.id
 }
