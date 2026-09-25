@@ -1,0 +1,16 @@
+project_id = "YOUR_GCP_PROJECT_ID"
+
+region = "asia-south1"
+zone   = "asia-south1-a"
+
+project_name = "terraform-gcp-infra"
+
+public_subnet_cidr  = "10.20.1.0/24"
+private_subnet_cidr = "10.20.2.0/24"
+
+allowed_ssh_cidr = "YOUR_PUBLIC_IP/32"
+
+machine_type = "e2-micro"
+
+ssh_username   = "gcpadmin"
+ssh_public_key = "ssh-ed25519 YOUR_PUBLIC_KEY"
